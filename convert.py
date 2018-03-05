@@ -2,8 +2,7 @@
 
 import csv
 import os
-import sys, traceback, re
-
+import sys, traceback
 
 PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
 
@@ -13,11 +12,6 @@ HEADER_TEMPLATE = "!ACCNT\tNAME\tACCNTTYPE\tDESC\tACCNUM\tEXTRA\r\n"\
                  + "!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\tCLEAR\r\n"\
                  + "!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\tCLEAR\r\n"\
                  + "!ENDTRNS\r\n"
-
-
-#output_file.write(template.format(transaction_type, date, account, name, amount, memo,
-#                                  transaction_type, date, name, -amount, memo))
-
 
 FORMAT_DESCRIPTORS = {
   'usbank_checking': {
@@ -34,7 +28,6 @@ FORMAT_DESCRIPTORS = {
                    + "ENDTRNS\r\n",
     'is_credit_account' : True
   }
-
 }
 
 
@@ -61,30 +54,9 @@ def main(input_file_name):
   template = descriptor['transaction']
   is_credit_account = descriptor['is_credit_account']
 
-  # This is the IIF template
-
-  #head = "!TRNS	TRNSID	TRNSTYPE	DATE	ACCNT	NAME	CLASS	AMOUNT	DOCNUM	MEMO	CLEAR	TOPRINT	NAMEISTAXABLE	DUEDATE	TERMS	PAYMETH	SHIPVIA	SHIPDATE	REP	FOB	PONUM	INVMEMO	ADDR1	ADDR2	ADDR3	ADDR4	ADDR5	SADDR1	SADDR2	SADDR3	SADDR4	SADDR5	TOSEND	ISAJE	OTHER1	ACCTTYPE	ACCTSPECIAL\r\n"\
-  #       + "!SPL	SPLID	TRNSTYPE	DATE	ACCNT	NAME	CLASS	AMOUNT	DOCNUM	MEMO	CLEAR	QNTY	PRICE	INVITEM	PAYMETH	TAXABLE	EXTRA	VATCODE	VATRATE	VATAMOUNT	VALADJ	SERVICEDATE	TAXCODE	TAXRATE	TAXAMOUNT	TAXITEM	OTHER2	OTHER3	REIMBEXP	ACCTTYPE	ACCTSPECIAL	ITEMTYPE\r\n"\
-  #+ "!ENDTRNS\r\n"
-  # head = "!ACCNT\tNAME\tACCNTTYPE\tDESC\tACCNUM\tEXTRA\r\n"\
-  # + "ACCNT\t{}\tBANK\r\n".format(account)
-  #
-  # head += "ACCNT\tBusiness Misc. Expense\tEXP\r\n"\
-  # + "!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\tCLEAR\r\n"\
-  # + "!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\tCLEAR\r\n"\
-  # + "!ENDTRNS\r\n"
-
   head = HEADER_TEMPLATE.format(account=account)
 
   output_file.write(head)
-
-  #template = "TRNS		CHECK	%s	%s	 %s		%s		N	N	%s																			N			CCARD\r\n"\
-  #           + "SPL		CHECK	%s	Ask My Accountant			%s				0	%s							0.00					0.00					EXP\r\n"\
-  #+ "ENDTRNS\r\n"
-
-  # template = "TRNS\t{}\t{}\t{}\t{}\t{}\t{}\tN\r\n"\
-  # + "SPL\t{}\t{}\tBusiness Misc. Expense\t{}\t{}\t{}\tN\r\n"\
-  # + "ENDTRNS\r\n"
 
   found_header = False
 
@@ -126,11 +98,6 @@ def main(input_file_name):
         except:
           error(str(row))
           continue
-
-
-        # template = "TRNS\tCHECK\t3/1/2018\tUS Bank Checking\tSome Junky Expense\t-10000\tThis is a check\tN\r\n"\
-        # + "SPL\tCHECK\t3/1/2018\tBusiness Misc. Expense\tSome Junky Expense\t10000\tThis is a check\tN\r\n"\
-        # + "ENDTRNS\r\n"
 
         data['transaction_type'] = transaction_type
 
