@@ -19,28 +19,54 @@ HEADER_TEMPLATE = "!ACCNT\tNAME\tACCNTTYPE\tDESC\tACCNUM\tEXTRA\r\n"\
 FORMAT_DESCRIPTORS = {
   'usbank_checking': {
     'csv_columns' : ['date', 'transaction', 'name', 'memo', 'amount'],
-    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{name}\t{amount:.2f}\t{memo}\tN\r\n"\
-                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{memo}\tN\r\n"\
+    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{name}\t{amount:.2f}\t{memo}\tY\r\n"\
+                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{memo}\tY\r\n"\
                    + "ENDTRNS\r\n",
     'account_type' : 'BANK',
     'is_credit_account' : False
   },
-  'capitalone_credit_card': {
-    'csv_columns' : ['transaction_date', 'posted_date', 'card_num_last4', 'name', 'category', 'debit', 'credit'],
-    'transaction': "TRNS\t{transaction_type}\t{transaction_date}\t{account}\t{name}\t{amount:.2f}\t{category}\tN\r\n"\
-                   + "SPL\t{transaction_type}\t{transaction_date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{category}\tN\r\n"\
+  'usbank_credit_card': {
+    'csv_columns' : ['date', 'transaction', 'name', 'memo', 'amount'],
+    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{name}\t{amount:.2f}\t{memo}\tY\r\n"\
+                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{memo}\tY\r\n"\
                    + "ENDTRNS\r\n",
     'account_type' : 'CCARD',
     'is_credit_account' : True
-  }
+  },
+  'capitalone_credit_card': {
+    'csv_columns' : ['transaction_date', 'posted_date', 'card_num_last4', 'name', 'category', 'debit', 'credit'],
+    'transaction': "TRNS\t{transaction_type}\t{transaction_date}\t{account}\t{name}\t{amount:.2f}\t{category}\tY\r\n"\
+                   + "SPL\t{transaction_type}\t{transaction_date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{category}\tY\r\n"\
+                   + "ENDTRNS\r\n",
+    'account_type' : 'CCARD',
+    'is_credit_account' : True
+  },
+  'citibank_credit_card' : {
+    'csv_columns' : ['status', 'date', 'description', 'debit', 'credit', 'member_name'],
+    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{description}\t{amount:.2f}\t{member_name}\tN\r\n"\
+                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{description}\t{negative_amount:.2f}\t{member_name}\tY\r\n"\
+                   + "ENDTRNS\r\n",
+    'account_type' : 'CCARD',
+    'is_credit_account' : True
+  },
+  'citibank_credit_card_annual_summary' : {
+    'csv_columns' : ['date', 'description', 'debit', 'credit', 'category'],
+    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{description}\t{amount:.2f}\t{category}\tN\r\n"\
+                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{description}\t{negative_amount:.2f}\t{category}\tY\r\n"\
+                   + "ENDTRNS\r\n",
+    'account_type' : 'CCARD',
+    'is_credit_account' : True
+  },
+
 }
 
-Y_M_D_RE = re.compile('(\d{4})[\-/](\d\d)[\-/](\d\d)')
+Y_M_D_RE = re.compile('(\d{4})[\-/]([01]?\d)[\-/]([0-3]?\d)')
+M_D_Y_RE = re.compile('([01]?\d)[\-/]([0-3]?\d)[\-/](\d{4})')
 
 
 def compute_transaction_type(is_credit_account, amount):
   if is_credit_account:
-    if amount < 0:
+    if amount <= 0:
       return 'CREDIT CARD'
     else:
       return 'CC CREDIT'
@@ -93,11 +119,11 @@ def main(input_file_name=None, output_file_name=None, format=None, account=None)
 
     with output_file:
       for row in csv_reader:
+        print(row)
+
         if not found_header:
           found_header = True
           continue
-
-        print(row)
 
         data = {
           'account': account
@@ -107,39 +133,53 @@ def main(input_file_name=None, output_file_name=None, format=None, account=None)
 
         try:
           for i, field in enumerate(csv_columns):
+            inner_amount = None
+
             x = row[i]
 
             if field == 'amount':
-              amount = float(x)
-              if is_credit_account:
-                amount = -amount
+              inner_amount = float(x)
             elif field.endswith('date'):
+                d = None
+
                 m = Y_M_D_RE.match(x.strip())
 
                 if m:
                   print("Date matches YYYY-MM-DD")
                   d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                else:
+                  m = M_D_Y_RE.match(x.strip())
+
+                  if m:
+                    print("Date matches MM-DD-YYYY")
+                    d = date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
+
+                if d:
                   x = d.strftime('%-m/%-d/%Y')
                 else:
                   print("Non-matching date " + x)
 
-
             elif len(x) > 0:
               if field == 'debit':
-                amount = -float(x)
+                inner_amount = -float(x)
               elif field == 'credit':
-                amount = float(x)
+                inner_amount = float(x)
 
-            if amount == None:
+            if inner_amount is None:
               x = x.strip()
               data[field] = x
             else:
-              data['amount'] = amount
-              data['negative_amount'] = -amount
+              amount = inner_amount
 
         except:
           error(str(row))
           continue
+
+        if amount is None:
+          amount = 0
+
+        data['amount'] = amount
+        data['negative_amount'] = -amount
 
         data['transaction_type'] = compute_transaction_type(is_credit_account, amount)
 
