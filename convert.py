@@ -76,31 +76,36 @@ def compute_transaction_type(is_credit_account, amount):
     else:
       return 'DEPOSIT'
 
+import sys, traceback, re
 
 def error(trans):
   sys.stderr.write("%s\n" % trans)
   traceback.print_exc(None, sys.stderr)
 
-def main(input_file_name=None, output_file_name=None, format=None, account=None):
-  print("Converting {} ...".format(input_file_name))
-  input_file = open(os.path.join(PROJECT_ROOT, input_file_name), 'r')
+def main(args):
+  print(f"Converting {args.input_filename} ...")
+  input_file = open(args.input_filename, 'r')
   #output_file = open(os.path.join(PROJECT_ROOT, input_file_name + '.iif'), 'w')
 
-  output_file_name = '/mnt/Pool1/backup-src/' + input_file_name + '.iif'
-  #output_filename = os.path.join(PROJECT_ROOT, input_file_name + '.iif')
+  base_filename = os.path.basename(args.input_filename)
 
-  if not output_file_name:
-    output_filename = os.path.join(PROJECT_ROOT, input_file_name + '.iif')
+  output_filename = base_filename[:base_filename.rfind('.csv')] + '.iif'
 
-  print("Output filename = {}".format(output_file_name))
+  output_filename = os.path.join(args.output_dir, output_filename)  
 
-  output_file = open(output_file_name, 'w')
+  print(f"Output filename = {output_filename}")
+
+  output_file = open(output_filename, 'w')
+
+  # This is the name of the QuickBooks checking account
+  account = args.account_name or 'US Bank Checking'
+
+  print(f"Account name = {account}")
 
   # This is the name of the QuickBooks checking account
   #account = 'US Bank Checking'
 
-  if not format:
-    format = 'usbank_checking'
+  format = args.format or 'usbank_checking'
 
   descriptor = FORMAT_DESCRIPTORS[format]
   csv_columns = descriptor['csv_columns']
@@ -155,7 +160,7 @@ def main(input_file_name=None, output_file_name=None, format=None, account=None)
                     d = date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
 
                 if d:
-                  x = d.strftime('%-m/%-d/%Y')
+                  x = d.strftime('%m/%d/%Y')
                 else:
                   print("Non-matching date " + x)
 
@@ -192,11 +197,11 @@ def main(input_file_name=None, output_file_name=None, format=None, account=None)
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Convert a CSV file to IIF format.')
-  parser.add_argument('input_file_name', metavar='input_file', help='Filename of CSV file to convert')
-  parser.add_argument('output_file_name', metavar='output_file', help='Output filename of IIF file', nargs='?')
-  parser.add_argument('--account', help='Name of the account to import into', required=True)
-  parser.add_argument('--format', help='Format of CSV file', default='usbank_checking')
+  parser.add_argument('input_filename', help='Filename of CSV file to convert')      
+  parser.add_argument('-o', '--output-dir', help='Output directory', default=".")
+  parser.add_argument('-a', '--account-name', help='Name of the account')
+  parser.add_argument('-f', '--format', help='Format of CSV file', default='usbank_checking')
+  
+  main_args = parser.parse_args()
 
-  args = vars(parser.parse_args())
-
-  main(**args)
+  main(main_args)
