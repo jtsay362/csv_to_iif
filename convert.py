@@ -4,8 +4,9 @@ import argparse
 import csv
 import os
 import re
-from datetime import date
-import sys, traceback
+import sys
+import traceback
+from datetime import date, datetime
 
 PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
 
@@ -18,47 +19,51 @@ HEADER_TEMPLATE = "!ACCNT\tNAME\tACCNTTYPE\tDESC\tACCNUM\tEXTRA\r\n"\
 
 FORMAT_DESCRIPTORS = {
   'usbank_checking': {
-    'csv_columns' : ['date', 'transaction', 'name', 'memo', 'amount'],
+    'csv_columns': ['date', 'transaction', 'name', 'memo', 'amount'],
     'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{name}\t{amount:.2f}\t{memo}\tY\r\n"\
                    + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{memo}\tY\r\n"\
                    + "ENDTRNS\r\n",
-    'account_type' : 'BANK',
-    'is_credit_account' : False
+    'account_type': 'BANK',
+    'is_credit_account': False
   },
   'usbank_credit_card': {
-    'csv_columns' : ['date', 'transaction', 'name', 'memo', 'amount'],
+    'csv_columns': ['date', 'transaction', 'name', 'memo', 'amount'],
     'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{name}\t{amount:.2f}\t{memo}\tY\r\n"\
                    + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{memo}\tY\r\n"\
                    + "ENDTRNS\r\n",
-    'account_type' : 'CCARD',
-    'is_credit_account' : True
+    'account_type': 'CCARD',
+    'is_credit_account': True
   },
   'capitalone_credit_card': {
-    'csv_columns' : ['transaction_date', 'posted_date', 'card_num_last4', 'name', 'category', 'debit', 'credit'],
-    'transaction': "TRNS\t{transaction_type}\t{transaction_date}\t{account}\t{name}\t{amount:.2f}\t{category}\tY\r\n"\
-                   + "SPL\t{transaction_type}\t{transaction_date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{category}\tY\r\n"\
-                   + "ENDTRNS\r\n",
-    'account_type' : 'CCARD',
-    'is_credit_account' : True
+    'csv_columns': ['transaction_date', 'posted_date', 'card_num_last4', 'name', 'category', 'debit', 'credit'],
+    'transaction': "TRNS\t{transaction_type}\t{transaction_date}\t{account}\t{name}\t{amount:.2f}\t{category}\tY\r\n"
+        + "SPL\t{transaction_type}\t{transaction_date}\tBusiness Misc. Expense\t{name}\t{negative_amount:.2f}\t{category}\tY\r\n"
+        + "ENDTRNS\r\n",
+    'account_type': 'CCARD',
+    'is_credit_account': True
   },
   'citibank_credit_card' : {
-    'csv_columns' : ['status', 'date', 'description', 'debit', 'credit', 'member_name'],
-    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{description}\t{amount:.2f}\t{member_name}\tN\r\n"\
-                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{description}\t{negative_amount:.2f}\t{member_name}\tY\r\n"\
-                   + "ENDTRNS\r\n",
-    'account_type' : 'CCARD',
+    'csv_columns': ['status', 'date', 'description', 'debit', 'credit', 'member_name'],
+    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{description}\t{amount:.2f}\t{member_name}\tN\r\n"
+        + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{description}\t{negative_amount:.2f}\t{member_name}\tY\r\n"
+        + "ENDTRNS\r\n",
+    'account_type': 'CCARD',
     'is_credit_account' : True
   },
   'citibank_credit_card_annual_summary' : {
-    'csv_columns' : ['date', 'description', 'debit', 'credit', 'category'],
-    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{description}\t{amount:.2f}\t{category}\tN\r\n"\
-                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{description}\t{negative_amount:.2f}\t{category}\tY\r\n"\
+    'csv_columns': ['date', 'description', 'debit', 'credit', 'category'],
+    'transaction': "TRNS\t{transaction_type}\t{date}\t{account}\t{description}\t{amount:.2f}\t{category}\tN\r\n"
+                   + "SPL\t{transaction_type}\t{date}\tBusiness Misc. Expense\t{description}\t{negative_amount:.2f}\t{category}\tY\r\n"
                    + "ENDTRNS\r\n",
-    'account_type' : 'CCARD',
-    'is_credit_account' : True
+    'account_type': 'CCARD',
+    'is_credit_account': True
   },
 
 }
+
+DATE_FORMATS = [
+  '%b %d, %Y'
+]
 
 Y_M_D_RE = re.compile('(\d{4})[\-/]([01]?\d)[\-/]([0-3]?\d)')
 M_D_Y_RE = re.compile('([01]?\d)[\-/]([0-3]?\d)[\-/](\d{4})')
@@ -76,7 +81,7 @@ def compute_transaction_type(is_credit_account, amount):
     else:
       return 'DEPOSIT'
 
-import sys, traceback, re
+
 
 def error(trans):
   sys.stderr.write("%s\n" % trans)
@@ -147,17 +152,26 @@ def main(args):
             elif field.endswith('date'):
                 d = None
 
-                m = Y_M_D_RE.match(x.strip())
+                x = x.strip()
 
-                if m:
-                  print("Date matches YYYY-MM-DD")
-                  d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-                else:
-                  m = M_D_Y_RE.match(x.strip())
+                for date_format in DATE_FORMATS:
+                  try:
+                    d = datetime.strptime(x, date_format).date()
+                  except ValueError:
+                    pass
+
+                if d is None:
+                  m = Y_M_D_RE.match(x)
 
                   if m:
-                    print("Date matches MM-DD-YYYY")
-                    d = date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
+                    print("Date matches YYYY-MM-DD")
+                    d = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                  else:
+                    m = M_D_Y_RE.match(x)
+
+                    if m:
+                      print("Date matches MM-DD-YYYY")
+                      d = date(int(m.group(3)), int(m.group(1)), int(m.group(2)))
 
                 if d:
                   x = d.strftime('%m/%d/%Y')
@@ -167,9 +181,14 @@ def main(args):
             elif len(x) > 0:
               if field == 'debit':
                 inner_amount = -float(x)
+
+                if is_credit_account and (inner_amount > 0):
+                  inner_amount = -inner_amount
               elif field == 'credit':
                 inner_amount = float(x)
 
+                if is_credit_account and (inner_amount < 0):
+                  inner_amount = -inner_amount
             if inner_amount is None:
               x = x.strip()
               data[field] = x
@@ -190,10 +209,10 @@ def main(args):
 
         print("data = " + str(data))
 
-
         output_file.write(template.format(**data))
 
   print('Done.')
+
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Convert a CSV file to IIF format.')
